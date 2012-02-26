@@ -25,6 +25,31 @@ class whereAmI(Plugin):
         latitude = mapGetLocation.latitude
         longitude = mapGetLocation.longitude
         url = u"http://maps.googleapis.com/maps/api/geocode/json?latlng={0},{1}&sensor=false&language={2}".format(str(latitude),str(longitude), language)
+        url2 = u"http://maps.googleapis.com/maps/api/elevation/json?locations={0},{1}&sensor=false&language={2}".format(str(latitude),str(longitude), language)
+        try:
+            jsonString2 = urllib2.urlopen(url2, timeout=3).read()
+        except:
+            pass
+        if jsonString2 != None:
+	    response = json.loads(jsonString2)
+            if response['status'] == 'OK':
+                elevation = response['results'][0]['elevation']
+                ele = int(elevation+0.5) 
+                #ele = round(elevation,0) 
+                if language == "de-DE":
+                    the_header="Dein Standort"
+                else:
+                    the_header="Your location"
+            else:
+                if language=="de-DE":
+                    self.say('Die Hoehenangaben waren ungenuegend!','')
+                else:
+                    self.say('No elevation data found!','')
+        else:
+            if language=="de-DE":
+                self.say('Ich konnte keine Verbindung zu Googlemaps aufbauen','Fehler')
+            else:
+                self.say('Could not establish a conenction to Googlemaps','Error');
         try:
             jsonString = urllib2.urlopen(url, timeout=3).read()
         except:
@@ -33,6 +58,7 @@ class whereAmI(Plugin):
             response = json.loads(jsonString)
             if response['status'] == 'OK':
                 components = response['results'][0]['address_components']              
+                number = filter(lambda x: True if "street_number" in x['types'] else False, components)[0]['long_name']
                 street = filter(lambda x: True if "route" in x['types'] else False, components)[0]['long_name']
                 stateLong= filter(lambda x: True if "administrative_area_level_1" in x['types'] or "country" in x['types'] else False, components)[0]['long_name']
                 try:
@@ -47,10 +73,12 @@ class whereAmI(Plugin):
                 view = AddViews(self.refId, dialogPhase="Completion")
                 if language == "de-DE":
                     the_header="Dein Standort"
+                    ele = str(ele) + " Hoehenmeter"
                 else:
                     the_header="Your location"
-                Location=SiriLocation(the_header, street, city, stateLong, countryCode, postalCode, latitude, longitude)
-                mapsnippet = SiriMapItemSnippet(items=[SiriMapItem(the_header, Location)])
+                    ele = str(ele) + " altitude"
+                Location=SiriLocation(ele, street + " " + number, city, stateLong, countryCode, postalCode, latitude, longitude)
+                mapsnippet = SiriMapItemSnippet(items=[SiriMapItem(ele, Location)])
                 view.views = [AssistantUtteranceView(text=the_header, dialogIdentifier="Map"), mapsnippet]
                 self.sendRequestWithoutAnswer(view)
             else:
